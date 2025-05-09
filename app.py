@@ -1,31 +1,32 @@
-from flask import Flask, request, jsonify
-from quiz_gen import generate_questions
-from flashcard_gen import generate_flashcards
-from study_plan import recommend_plan
-from logger import log_progress
+from flask import Flask, render_template, request
+from utils.summarizer import summarize_text
+from utils.flashcard_gen import generate_flashcards
+from utils.quiz_gen import generate_quiz
+from utils.study_plan import generate_study_plan
+from utils.ner_extractor import extract_entities
 
 app = Flask(__name__)
 
-@app.route('/quiz', methods=['POST'])
-def quiz():
-    text = request.json['text']
-    questions = generate_questions(text)
-    log_progress("Student1", "quiz_generated")
-    return jsonify({"questions": questions})
+@app.route('/', methods=["GET", "POST"])
+def index():
+    output = None
+    if request.method == "POST":
+        text = request.form["input_text"]
+        summary = summarize_text(text)
+        entities = extract_entities(text)
+        flashcards = generate_flashcards(summary)
+        quiz = generate_quiz(summary, entities)
+        study_plan = generate_study_plan(text)
 
-@app.route('/flashcards', methods=['POST'])
-def flashcards():
-    text = request.json['text']
-    cards = generate_flashcards(text)
-    log_progress("Student1", "flashcards_generated")
-    return jsonify({"flashcards": cards})
+        output = {
+            "summary": summary,
+            "flashcards": flashcards,
+            "quiz": quiz,
+            "study_plan": study_plan,
+            "entities": entities
+        }
 
-@app.route('/study_plan', methods=['POST'])
-def study():
-    hours = request.json['hours']
-    plan = recommend_plan(hours)
-    log_progress("Student1", "study_plan_suggested")
-    return jsonify({"plan": plan})
+    return render_template("index.html", output=output)
 
 if __name__ == '__main__':
     app.run(debug=True)
